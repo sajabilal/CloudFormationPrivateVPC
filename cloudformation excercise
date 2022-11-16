@@ -1,0 +1,224 @@
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties: 
+      CidrBlock: 10.0.0.0/24
+
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: false
+      CidrBlock: 10.0.0.0/28
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: false
+      CidrBlock: 10.0.0.16/28
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true
+      CidrBlock: 10.0.0.32/28
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
+
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      MapPublicIpOnLaunch: true
+      CidrBlock: 10.0.0.48/28
+      AvailabilityZone: !Select [ 1, !GetAZs '' ]
+
+  InternetGateway: 
+    Type: AWS::EC2::InternetGateway
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties: 
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref VPC
+
+  NATGateway:
+    Type: AWS::EC2::NatGateway
+    Properties: 
+      AllocationId: !GetAtt 'EIP.AllocationId'
+      SubnetId: !Ref PublicSubnet1
+
+  EIP: 
+    Type: AWS::EC2::EIP
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    Properties: 
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+
+  PrivateRoute:
+    Type: AWS::EC2::Route
+    Properties: 
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+
+  privateSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet1
+      RouteTableId: !Ref PrivateRouteTable
+
+  privateSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnet2
+      RouteTableId: !Ref PrivateRouteTable
+
+  publicSubnet1RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet1
+      RouteTableId: !Ref PublicRouteTable		
+
+  publicSubnet2RouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet2
+      RouteTableId: !Ref PublicRouteTable
+  
+  KeyPair:
+    Type: AWS::EC2::KeyPair
+    Properties: 
+      KeyName: formationKey
+      
+  PublicEC2: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: "ami-09d3b3274b6c5d4aa"
+      KeyName: !Ref KeyPair
+      InstanceType: t2.micro 
+      SecurityGroupIds: 
+        - !Ref PublicSecurityGroup
+      SubnetId: !Ref PublicSubnet1
+      UserData: 
+        Fn::Base64: 
+          !Sub |
+            #!/bin/bash
+            cat >> ~ec2-user/.ssh/authorized_keys << EOF
+            ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCVYAXiGxD+z5BQi9BjNpH31gpcxuQm192rxRSElBHF/1jG5EX7cj8/rkJl1qSTqiWxLs9z3p5I0uQujdb7N901Oeatxnp/DRFoysdzBahC2jRP2gEhSPFYdCk2fhtXDR/EitVlCs/jctoA/T4LfSdz83KQ1uFtFYXxpKbyHDQ65wKLcdtWJE+kXOMGciy7CFocjcck4BIcoWLNoPxzg9mJtJ2PhoI3Q0ToHMlInJWUfxsGL05RZhBWgV66KW4t3wSvy+FexDJRqd0/+mTTOPv3Yd26br2kQd/LfwKTLtWAvvwIEAvKZdBcpCa6izpn3pX81/0pppZPPXsC22NjbkV4QClEFSVU9M/MgQoZw9C6aBUny39XVoiBONUXBOK4utegLdsDq4EhNXxFlDMfzQ31dWk6lqIIdl2Olb9JcyOOY43JR9H4weIwFyUvv1+LVSdrnasbF3nMcgVp687aQtrQEqpmXcEgD1OfI5V1cRuhlk6eqq7y8o1yR6gHTn/bqgU= saja@saja-pc
+            EOF
+ 
+
+  PrivateEC2: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: "ami-09d3b3274b6c5d4aa"
+      KeyName: !Ref KeyPair
+      InstanceType: t2.micro 
+      SecurityGroupIds: 
+        - !Ref PrivateSecurityGroup
+      SubnetId: !Ref PrivateSubnet1  
+      
+  PrivateEC22: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: "ami-09d3b3274b6c5d4aa"
+      KeyName: !Ref KeyPair
+      InstanceType: t2.micro 
+      SecurityGroupIds: 
+        - !Ref PrivateSecurityGroup
+      SubnetId: !Ref PrivateSubnet2   
+        
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Subnets:
+        - !Ref PublicSubnet1
+        - !Ref PublicSubnet2
+
+  HTTPListener:
+    Type: "AWS::ElasticLoadBalancingV2::Listener"
+    Properties:
+      DefaultActions:
+        - Type: fixed-response
+          FixedResponseConfig:
+            StatusCode: '404'
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: "HTTP"
+    
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VPC
+      HealthCheckEnabled: true
+      Name: Targets
+      TargetType: instance
+      Protocol: "HTTP"
+      Port: "80"
+      Targets:
+        - Id: !Ref PrivateEC22
+        - Id: !Ref PrivateEC2      
+        
+  PublicSecurityGroup: 
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http and ssh to client host
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          
+  PrivateSecurityGroup: 
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http and ssh to private ec2
+      VpcId: !Ref VPC
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 10.0.0.0/24
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 10.0.0.0/24
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 10.0.0.0/24
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 10.0.0.0/24
